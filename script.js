@@ -115,28 +115,75 @@ function streakHtml(arr){
 // ═══════════════════════════════════════════
 // PLAYER SEARCH WIDGET
 // ═══════════════════════════════════════════
-function playerSearchWidget(containerId, selected, maxSelect, onToggle){
-  const c=document.getElementById(containerId);
+// Global registry: widgetId -> {selected:[], multi:bool, onChange:fn}
+const _psWidgets = {};
+
+function psWidget(containerId, opts){
+  // opts: { selected:[], multi:bool, onChange:fn(newSelected) }
+  _psWidgets[containerId] = opts;
+  _psRender(containerId);
+}
+
+function _psRender(containerId){
+  const c = document.getElementById(containerId);
   if(!c) return;
-  const q=(c.querySelector('.ps-input')||{value:''}).value.toLowerCase();
-  const filtered=DB.players.filter(p=>p.name.toLowerCase().includes(q));
-  const selArr=Array.isArray(selected)?selected:[selected].filter(Boolean);
-  c.innerHTML=`
-    <div class="input-search mb8" style="margin-bottom:8px">
+  const state = _psWidgets[containerId];
+  const q = (c.querySelector('.ps-input') || {value:''}).value.toLowerCase();
+  const filtered = DB.players.filter(p => p.name.toLowerCase().includes(q));
+  const sel = state.selected;
+
+  c.innerHTML = `
+    <div class="input-search" style="margin-bottom:8px;position:relative">
+      <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none">🔍</span>
       <input class="input ps-input" placeholder="Search players…" value="${q}"
-        oninput="playerSearchWidget('${containerId}',selectedPlayers_${containerId},${maxSelect},${onToggle})">
+        style="padding-left:34px"
+        oninput="_psSearch('${containerId}', this.value)">
     </div>
     <div class="player-grid">
-      ${filtered.length?filtered.map(p=>{
-        const sel=selArr.includes(p.id);
-        const order=selArr.indexOf(p.id)+1;
-        return `<button class="p-chip${sel?' selected':''}" onclick="togglePS_${containerId}('${p.id}')">
+      ${filtered.length ? filtered.map(p => {
+        const isSel = sel.includes(p.id);
+        const order = sel.indexOf(p.id) + 1;
+        return `<button class="p-chip${isSel?' selected':''}"
+          onclick="_psToggle('${containerId}','${p.id}')">
           ${p.name}
-          ${sel&&maxSelect>2?`<span class="p-chip-num">${order}</span>`:''}
+          ${isSel && state.multi && sel.length > 1 ? `<span class="p-chip-num">${order}</span>` : ''}
         </button>`;
-      }).join(''):'<div style="color:var(--muted);font-size:13px;grid-column:span 2;padding:8px">No players found</div>'}
+      }).join('') : '<div style="color:var(--muted);font-size:13px;grid-column:span 2;padding:8px">No players found</div>'}
     </div>
   `;
+}
+
+function _psSearch(containerId, q){
+  // preserve query in the input but re-render list
+  const c = document.getElementById(containerId);
+  if(!c) return;
+  const state = _psWidgets[containerId];
+  const filtered = DB.players.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+  const sel = state.selected;
+  const grid = c.querySelector('.player-grid');
+  if(!grid) return;
+  grid.innerHTML = filtered.length ? filtered.map(p => {
+    const isSel = sel.includes(p.id);
+    const order = sel.indexOf(p.id) + 1;
+    return `<button class="p-chip${isSel?' selected':''}"
+      onclick="_psToggle('${containerId}','${p.id}')">
+      ${p.name}
+      ${isSel && state.multi && sel.length > 1 ? `<span class="p-chip-num">${order}</span>` : ''}
+    </button>`;
+  }).join('') : '<div style="color:var(--muted);font-size:13px;grid-column:span 2;padding:8px">No players found</div>';
+}
+
+function _psToggle(containerId, id){
+  const state = _psWidgets[containerId];
+  if(state.multi){
+    const idx = state.selected.indexOf(id);
+    if(idx >= 0) state.selected.splice(idx, 1);
+    else state.selected.push(id);
+  } else {
+    state.selected = state.selected[0] === id ? [] : [id];
+  }
+  if(state.onChange) state.onChange(state.selected);
+  _psRender(containerId);
 }
 
 // ═══════════════════════════════════════════
@@ -203,8 +250,6 @@ function renderHome(){
 // GAME SETUP
 // ═══════════════════════════════════════════
 let gSetup={p1:null,p2:null};
-window.selectedPlayers_game_p1=null;
-window.selectedPlayers_game_p2=null;
 
 function startGameSetup(){
   gSetup={p1:null,p2:null};
@@ -224,19 +269,8 @@ function startGameSetup(){
     </div>
   `;
   openM('game');
-  // Setup search widgets
-  window.selectedPlayers_game_p1=null;
-  window.selectedPlayers_game_p2=null;
-  window.togglePS_gp1_wrap=function(id){
-    gSetup.p1=id; window.selectedPlayers_game_p1=id;
-    playerSearchWidget('gp1-wrap',[id],1,'window.togglePS_gp1_wrap');
-  };
-  window.togglePS_gp2_wrap=function(id){
-    gSetup.p2=id; window.selectedPlayers_game_p2=id;
-    playerSearchWidget('gp2-wrap',[id],1,'window.togglePS_gp2_wrap');
-  };
-  playerSearchWidget('gp1-wrap',[],1,'window.togglePS_gp1_wrap');
-  playerSearchWidget('gp2-wrap',[],1,'window.togglePS_gp2_wrap');
+  psWidget('gp1-wrap', { selected:[], multi:false, onChange: sel=>{ gSetup.p1=sel[0]||null; } });
+  psWidget('gp2-wrap', { selected:[], multi:false, onChange: sel=>{ gSetup.p2=sel[0]||null; } });
 }
 
 function launchGame(){
@@ -390,19 +424,6 @@ let tSetup={name:'',format:'semi',selected:[]};
 
 function startTournamentSetup(){
   tSetup={name:'',format:'semi',selected:[]};
-  window.selectedPlayers_tourn=[];
-  window.togglePS_t_wrap=function(id){
-    const arr=window.selectedPlayers_tourn;
-    const idx=arr.indexOf(id);
-    if(idx>=0) arr.splice(idx,1); else arr.push(id);
-    tSetup.selected=[...arr];
-    playerSearchWidget('t-wrap',arr,999,'window.togglePS_t_wrap');
-  };
-  renderTournSetupModal();
-  openM('tournament');
-}
-
-function renderTournSetupModal(){
   mEl('tournament').innerHTML=`
     <div class="modal-handle"></div>
     <div class="modal-header">
@@ -411,14 +432,14 @@ function renderTournSetupModal(){
     </div>
     <div class="field">
       <label>Name</label>
-      <input class="input" id="t-name" placeholder="Round 1…" value="${tSetup.name}" oninput="tSetup.name=this.value">
+      <input class="input" id="t-name" placeholder="Round 1…" oninput="tSetup.name=this.value">
     </div>
     <div class="field">
       <label>Format</label>
       <select class="input" id="t-fmt" onchange="tSetup.format=this.value">
-        <option value="semi" ${tSetup.format==='semi'?'selected':''}>Semi-finals (½) — 2 semis + final</option>
-        <option value="quarter" ${tSetup.format==='quarter'?'selected':''}>Quarter-finals (¼) — 4 QF + 2 SF + final</option>
-        <option value="eighth" ${tSetup.format==='eighth'?'selected':''}>1/8 Finals — 8 + 4 QF + 2 SF + final</option>
+        <option value="semi">Semi-finals (½) — 2 semis + final</option>
+        <option value="quarter">Quarter-finals (¼) — 4 QF + 2 SF + final</option>
+        <option value="eighth">1/8 Finals — 8 + 4 QF + 2 SF + final</option>
       </select>
     </div>
     <div class="card-label">Select Players</div>
@@ -429,7 +450,8 @@ function renderTournSetupModal(){
       <button class="btn btn-primary flex-1" onclick="launchTournament()">Create</button>
     </div>
   `;
-  playerSearchWidget('t-wrap',tSetup.selected,999,'window.togglePS_t_wrap');
+  openM('tournament');
+  psWidget('t-wrap', { selected:[], multi:true, onChange: sel=>{ tSetup.selected=[...sel]; } });
 }
 
 function launchTournament(){
@@ -555,21 +577,6 @@ let lSetup={name:'',selected:[]};
 
 function startLeagueSetup(){
   lSetup={name:'',selected:[]};
-  window.selectedPlayers_league=[];
-  window.togglePS_l_wrap=function(id){
-    const arr=window.selectedPlayers_league;
-    const idx=arr.indexOf(id);
-    if(idx>=0) arr.splice(idx,1); else arr.push(id);
-    lSetup.selected=[...arr];
-    playerSearchWidget('l-wrap',arr,999,'window.togglePS_l_wrap');
-    const cnt=document.getElementById('l-player-count');
-    if(cnt) cnt.textContent=arr.length+' players selected, '+(arr.length*(arr.length-1))+' games total (each pair plays twice)';
-  };
-  renderLeagueSetupModal();
-  openM('league');
-}
-
-function renderLeagueSetupModal(){
   mEl('league').innerHTML=`
     <div class="modal-handle"></div>
     <div class="modal-header">
@@ -588,7 +595,18 @@ function renderLeagueSetupModal(){
       <button class="btn btn-primary flex-1" onclick="launchLeague()">Create League</button>
     </div>
   `;
-  playerSearchWidget('l-wrap',lSetup.selected,999,'window.togglePS_l_wrap');
+  openM('league');
+  psWidget('l-wrap', {
+    selected: [],
+    multi: true,
+    onChange: sel => {
+      lSetup.selected = [...sel];
+      const cnt = document.getElementById('l-player-count');
+      if(cnt) cnt.textContent = sel.length
+        ? sel.length + ' players selected, ' + (sel.length*(sel.length-1)) + ' games total (each pair plays twice)'
+        : 'Select at least 3 players';
+    }
+  });
 }
 
 function launchLeague(){
