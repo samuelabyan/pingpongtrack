@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PingTrack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <span class="topbar-logo">🏓</span>
+    <span class="topbar-title">Ping<span>Track</span></span>
+  </div>
+  <div class="topbar-right">
+    <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+  </div>
+</div>
+
+<!-- PAGES -->
+<div id="pg-home" class="page active"></div>
+<div id="pg-stats" class="page"></div>
+<div id="pg-history" class="page"></div>
+<div id="pg-settings" class="page"></div>
+
+<!-- NAV -->
+<nav>
+  <button class="active" onclick="showPage('home')"><span class="nav-ico">🏠</span>Home</button>
+  <button onclick="showPage('stats')"><span class="nav-ico">📊</span>Stats</button>
+  <button onclick="showPage('history')"><span class="nav-ico">📋</span>History</button>
+  <button onclick="showPage('settings')"><span class="nav-ico">⚙️</span>Settings</button>
+</nav>
+
+<div id="toast"></div>
+
+<!-- MODALS -->
+<div class="overlay" id="ov-game"><div class="modal" id="m-game"></div></div>
+<div class="overlay" id="ov-tournament"><div class="modal" id="m-tournament"></div></div>
+<div class="overlay" id="ov-league"><div class="modal" id="m-league"></div></div>
+<div class="overlay" id="ov-scoring"><div class="modal" id="m-scoring"></div></div>
+<div class="overlay" id="ov-player-detail"><div class="modal" id="m-player-detail"></div></div>
+<div class="overlay" id="ov-edit-score"><div class="modal" id="m-edit-score"></div></div>
+<div class="overlay" id="ov-tourn-play"><div class="modal" id="m-tourn-play"></div></div>
+<div class="overlay" id="ov-league-play"><div class="modal" id="m-league-play"></div></div>
+
+<script src="script.js"></script>
+</body>
+</html>
